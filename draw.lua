@@ -585,10 +585,131 @@ local function draw_cpu_history(cr, x, y, gw, gh, s)
     end
 end
 
+--- Garmin vital signs widget
+local function draw_garmin(cr, x, y, s)
+    local g = read_kv("/tmp/conky-garmin.txt", "_gm", 60)
+    if not g or g.BB == nil then return end
+
+    local gap = 26*s
+    txt(cr, "VITAL SIGNS", x, y, SANS, 22*s, C.green, true, "l")
+    ln(cr, x, y+14*s, x+140*s, y+14*s, 1*s, {C.green[1],C.green[2],C.green[3],0.2})
+    local ly = y + 38*s
+
+    local bb = tonumber(g.BB) or 0
+    local sleep_h = tonumber(g.SLEEP) or 0
+    local hr = tonumber(g.HR) or 0
+    local stress = tonumber(g.STRESS) or 0
+    local steps = g.STEPS or "0"
+
+    -- Body Battery with mini arc
+    local bb_col = bb > 60 and C.green or (bb > 30 and C.amber or C.coral)
+    arc(cr, x+16*s, ly+2*s, 10*s, 0, 360, 3*s, C.w05)
+    arc(cr, x+16*s, ly+2*s, 10*s, -90, -90+360*bb/100, 3*s, bb_col)
+    txt(cr, "BB "..g.BB.."/"..g.BB_PEAK, x+32*s, ly+6*s, MONO, 16*s, bb_col, false, "l")
+
+    ly = ly + gap
+    local sl_col = sleep_h >= 7 and C.green or (sleep_h >= 6 and C.amber or C.coral)
+    circ(cr, x+8*s, ly, 4*s, sl_col)
+    txt(cr, g.SLEEP.."h  score "..g.SLEEP_SCORE, x+18*s, ly+4*s, MONO, 16*s, sl_col, false, "l")
+
+    ly = ly + gap
+    circ(cr, x+8*s, ly, 4*s, C.coral)
+    txt(cr, g.HR.." bpm", x+18*s, ly+4*s, MONO, 16*s, C.w50, false, "l")
+
+    ly = ly + gap
+    local st_col = stress > 50 and C.coral or (stress > 25 and C.amber or C.green)
+    circ(cr, x+8*s, ly, 4*s, st_col)
+    txt(cr, "Stress "..g.STRESS.." ("..g.STRESS_TXT..")", x+18*s, ly+4*s, MONO, 16*s, st_col, false, "l")
+
+    ly = ly + gap
+    circ(cr, x+8*s, ly, 4*s, C.cyan)
+    txt(cr, steps.." steps", x+18*s, ly+4*s, MONO, 16*s, C.w50, false, "l")
+end
+
+--- Today's focus tasks
+local function draw_today(cr, x, y, s)
+    local f = io.open("/tmp/conky-today.txt", "r")
+    if not f then return end
+    local lines = {}
+    for l in f:lines() do
+        if l ~= "NO_TASKS" and l ~= "NO_FILE" then lines[#lines+1] = l end
+    end
+    f:close()
+    if #lines == 0 then return end
+
+    local gap = 24*s
+    txt(cr, "FOCUS", x, y, SANS, 18*s, C.amber, true, "l")
+    ln(cr, x, y+12*s, x+80*s, y+12*s, 1*s, {C.amber[1],C.amber[2],C.amber[3],0.2})
+    local ly = y + 36*s
+
+    for i, l in ipairs(lines) do
+        local done = l:match("^%- %[x%]")
+        local task = l:gsub("^%- %[.%] ", "")
+        if #task > 50 then task = task:sub(1,48)..".." end
+
+        if done then
+            -- Completed: dimmed
+            txt(cr, "x", x+6*s, ly+4*s, MONO, 12*s, C.green, false, "c")
+            txt(cr, task, x+18*s, ly+4*s, MONO, 12*s, C.w20, false, "l")
+        else
+            -- Pending: brighter
+            rrect(cr, x+2*s, ly-4*s, 10*s, 10*s, 2*s, C.w05)
+            txt(cr, task, x+18*s, ly+4*s, MONO, 13*s, C.w70, false, "l")
+        end
+        ly = ly + gap
+    end
+end
+
+--- Inbox badge (small, non-intrusive)
+local function draw_inbox_badge(cr, x, y, s)
+    local f = io.open("/tmp/conky-inbox.txt", "r")
+    if not f then return end
+    local n = tonumber(f:read("*l")) or 0
+    f:close()
+
+    local col = n == 0 and C.green or (n > 5 and C.coral or C.amber)
+    circ(cr, x, y, 8*s, {col[1], col[2], col[3], 0.15})
+    circ(cr, x, y, 5*s, col)
+    if n > 0 then
+        txt(cr, tostring(n), x, y+4*s, MONO, 10*s, C.white, true, "c")
+        txt(cr, "inbox", x+14*s, y+4*s, MONO, 12*s, col, false, "l")
+    end
+end
+
+--- Pending topics list
+local function draw_pending(cr, x, y, pw, s)
+    local f = io.open("/tmp/conky-pending.txt", "r")
+    if not f then return end
+    local items = {}
+    for l in f:lines() do
+        if l ~= "NO_ITEMS" and l ~= "NO_FILE" then
+            local num, tema, tipo, estado = l:match("^(%d+)|(.+)|(.+)|(.+)$")
+            if num then items[#items+1] = {num=num, tema=tema, tipo=tipo, estado=estado} end
+        end
+    end
+    f:close()
+    if #items == 0 then return end
+
+    local gap = 28*s
+    txt(cr, "PENDING", x, y, SANS, 22*s, C.purple, true, "l")
+    ln(cr, x, y+14*s, x+110*s, y+14*s, 1*s, {C.purple[1],C.purple[2],C.purple[3],0.25})
+    local ly = y + 42*s
+
+    for i, it in ipairs(items) do
+        if i > 7 then break end
+        local sc = C.w50
+        if it.estado:match("En curso") then sc = C.green
+        elseif it.estado:match("Planificado") then sc = C.cyan end
+        circ(cr, x+4*s, ly, 4*s, sc)
+        txt(cr, it.tema, x+16*s, ly+5*s, MONO, 16*s, C.w50, false, "l")
+        ly = ly + gap
+    end
+end
+
 --- Curved connection lines between elements
 local function draw_flow_lines(cr, w, h, s)
     -- Cluster to system info
-    local cx1, cy1 = w*0.14, h*0.25
+    local cx1, cy1 = w*0.14, h*0.22
     local sx, sy = w*0.28, h*0.12
     cairo_new_path(cr)
     cairo_move_to(cr, cx1 + 200*s, cy1)
@@ -650,7 +771,7 @@ function conky_main()
     draw_clock(cr, cal_right, h*0.13, s)
 
     -- ── Gauge cluster (left, big) ──
-    draw_cluster(cr, w*0.14, h*0.25, s)
+    draw_cluster(cr, w*0.14, h*0.22, s)
 
     -- ── Temperature gauges (below cluster) ──
     draw_temps(cr, w*0.08, h*0.52, s)
@@ -669,26 +790,33 @@ function conky_main()
     draw_net_graph(cr, ng_x, ng_y, ng_w, 40*s, net_hist_down, C.green, "DOWNLOAD", nd, "Total "..ntd, s)
     draw_net_graph(cr, ng_x, ng_y+100*s, ng_w, 40*s, net_hist_up, C.coral, "UPLOAD", nu, "Total "..ntu, s)
 
-    -- ── Calendar (right side) ──
-    local cal_w = w*0.14
-    local cal_h = h*0.55
-    local cal_x = w - w*0.06 - cal_w
-    draw_calendar(cr, cal_x, h*0.38, cal_w, cal_h, s)
-
     -- ── Processes (next to gauge cluster) ──
-    draw_procs(cr, w*0.28, h*0.22, s)
+    local proc_x = w*0.28
+    draw_procs(cr, proc_x, h*0.22, s)
 
-    -- ── Flow lines (connections between elements) ──
+    -- ── Flow lines ──
     draw_flow_lines(cr, w, h, s)
 
     -- ── System info (above processes) ──
-    draw_sysinfo(cr, w*0.28, h*0.12, s)
+    draw_sysinfo(cr, proc_x, h*0.12, s)
 
-    -- ── CPU load history (below gauge cluster, aligned with network) ──
+    -- ── Garmin vital signs (below processes) ──
+    draw_garmin(cr, proc_x, h*0.40, s)
+
+    -- ── CPU load history ──
     draw_cpu_history(cr, margin, h*0.40, ng_w, 60*s, s)
 
-    -- ── Next event countdown (above calendar) ──
-    draw_next_event(cr, cal_x + 20*s, h*0.38 - 110*s, cal_w, s)
+    -- ── Inbox badge (near clock) ──
+    draw_inbox_badge(cr, cal_right - 530*s, h*0.13 - 80*s, s)
+
+    -- ── Right side: Next event + Calendar + Pending ──
+    local cal_w = w*0.14
+    local cal_top = h*0.22
+    local cal_h = h*0.48
+    local cal_x = w - w*0.06 - cal_w
+
+    draw_calendar(cr, cal_x, cal_top, cal_w, cal_h, s)
+    draw_pending(cr, cal_x + 20*s, cal_top + cal_h + 130*s, cal_w, s)
 
     -- ── Now Playing + Visualizer (bottom-left) ──
     draw_np_vis(cr, margin, h*0.84, w*0.22, s)
