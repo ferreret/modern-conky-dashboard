@@ -188,12 +188,17 @@ local function get_calendar()
         end
         if ln ~= "" then
             -- TSV: start_date \t start_time \t end_date \t end_time \t summary
-            local sd, st, ed, et, summary = ln:match("^(%S+)\t(%S+)\t(%S+)\t(%S+)\t(.+)$")
-            if summary then
+            local fields = {}
+            for field in (ln .. "\t"):gmatch("([^\t]*)\t") do
+                table.insert(fields, field)
+            end
+            if #fields >= 5 then
                 table.insert(events, {
-                    date = sd, time = st,
-                    end_date = ed, end_time = et,
-                    title = summary
+                    date = fields[1],
+                    time = (fields[2] ~= "") and fields[2] or "all day",
+                    end_date = fields[3],
+                    end_time = fields[4],
+                    title = fields[5],
                 })
             end
         end
