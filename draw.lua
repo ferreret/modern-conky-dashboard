@@ -224,7 +224,7 @@ local function draw_cluster(cr, ox, oy, s)
     txt(cr, "GPU", gx, gy+28*s, SANS, 16*s, C.green, true, "c")
 end
 
---- Temperature gauges (BIGGER arcs)
+--- Temperature gauges with per-core heatmap
 local function draw_temps(cr, x, y, s)
     local ct = ctrim("${hwmon 4 temp 1}")
     local gt = ctrim("${nvidia gputemp}")
@@ -237,6 +237,24 @@ local function draw_temps(cr, x, y, s)
     arc(cr, x, y, r, 180, 180+180*math.min(cpu_t/100,1), 7*s, col_cpu)
     txt(cr, ct.."°", x, y-14*s, MONO, 28*s, col_cpu, false, "c")
     txt(cr, "CPU", x, y+28*s, SANS, 15*s, C.w35, false, "c")
+
+    -- Per-core heatmap dots below CPU temp
+    local nc = get_cores()
+    local dot_r = 5*s
+    local dot_gap = 14*s
+    local row_len = 8
+    local hx = x - (math.min(row_len, nc) - 1) * dot_gap / 2
+    for i = 1, nc do
+        local col_i = i - 1
+        local row = math.floor(col_i / row_len)
+        local col_pos = col_i % row_len
+        local dx = hx + col_pos * dot_gap
+        local dy = y + 44*s + row * dot_gap
+        -- Get per-core temp via sensors (hwmon4 temp 2..9 are cores)
+        local core_t = tonumber(ctrim("${hwmon 4 temp "..(i+1).."}")) or cpu_t
+        local tc = core_t > 80 and C.coral or (core_t > 65 and C.amber or C.green)
+        circ(cr, dx, dy, dot_r, tc)
+    end
 
     local gx = x + 155*s
     local col_gpu = gpu_t > 80 and C.coral or (gpu_t > 60 and C.amber or C.green)
@@ -298,10 +316,15 @@ local function draw_clock(cr, rx, y, s)
     local hrs, mns = cstr("${time %H}"), cstr("${time %M}")
     local sec = tonumber(cstr("${time %S}")) or 0
 
+    -- Decorative arc behind clock
+    local clock_cx = rx - 250*s
+    arc(cr, clock_cx, y-10*s, 220*s, -30, 210, 1.5*s, C.w05)
+    arc(cr, clock_cx, y-10*s, 235*s, -20, 60, 1*s, {C.cyan[1],C.cyan[2],C.cyan[3],0.04})
+
     -- Large time
     txt(cr, hrs..":"..mns, rx, y, MONO, 190*s, C.white, false, "r")
 
-    -- Seconds arc (small, separate from day)
+    -- Seconds arc
     local sr = 18*s
     local sx, sy = rx - 510*s, y - 70*s
     arc(cr, sx, sy, sr, -90, 270, 1.5*s, C.w05)
@@ -462,10 +485,20 @@ local function draw_sysinfo(cr, x, y, s)
     circ(cr, x-12*s, y-4*s, 3*s, C.cyan)
 
     local gap = 24*s
+    -- Check updates (cached hourly)
+    if not cache._upd or not cache._upd_t or os.time() - cache._upd_t >= 3600 then
+        local f = io.popen("apt list --upgradable 2>/dev/null | grep -c upgradable")
+        cache._upd = tonumber(f and f:read("*l")) or 0
+        if f then f:close() end
+        cache._upd_t = os.time()
+    end
+    local upd_str = cache._upd > 0 and ("  ·  "..cache._upd.." updates") or ""
+    local upd_col = cache._upd > 0 and C.amber or C.w50
+
     txt(cr, host, x, y, MONO, 22*s, C.cyan, true, "l")
     txt(cr, dist.."  ·  "..kern, x, y+gap, MONO, 16*s, C.w50, false, "l")
     txt(cr, cpu_n.."  ·  "..gpu_n, x, y+gap*2, MONO, 16*s, C.w50, false, "l")
-    txt(cr, "IP "..ip.."  ·  Up "..up, x, y+gap*3, MONO, 16*s, C.w50, false, "l")
+    txt(cr, "IP "..ip.."  ·  Up "..up..upd_str, x, y+gap*3, MONO, 16*s, upd_col, false, "l")
 end
 
 --- Next event countdown
@@ -510,12 +543,72 @@ local function draw_next_event(cr, x, y, pw, s)
 
     -- Accent line
     ln(cr, x, y, x + pw * 0.6, y, 1*s, {C.pink[1], C.pink[2], C.pink[3], 0.2})
+    circ(cr, x + pw * 0.6, y, 3*s, {C.pink[1], C.pink[2], C.pink[3], 0.3})
 
     txt(cr, "NEXT", x, y+22*s, SANS, 20*s, C.pink, true, "l")
     txt(cr, countdown, x + 70*s, y+22*s, MONO, 17*s, {C.pink[1], C.pink[2], C.pink[3], 0.7}, false, "l")
 
     local title = next_ev.title or ""
     txt(cr, next_ev.time.."  "..title, x, y+48*s, MONO, 16*s, C.w50, false, "l")
+end
+
+--- CPU load history graph (small bar chart)
+local cpu_hist = {}
+local CPU_HIST_LEN = 80
+local cpu_hist_frame = 0
+local function draw_cpu_history(cr, x, y, gw, gh, s)
+    -- Update every 5 frames (~1s)
+    cpu_hist_frame = cpu_hist_frame + 1
+    if cpu_hist_frame % 5 == 0 or #cpu_hist == 0 then
+        cpu_hist[#cpu_hist+1] = cnum("${cpu cpu0}")
+        while #cpu_hist > CPU_HIST_LEN do table.remove(cpu_hist, 1) end
+    end
+
+    txt(cr, "CPU LOAD", x, y-8*s, SANS, 14*s, C.cyan, false, "l")
+
+    if #cpu_hist > 0 then
+        local bw = 3*s
+        local gap = 0.5*s
+        local step = bw + gap
+        for i = 1, #cpu_hist do
+            local age = #cpu_hist - i
+            local val = cpu_hist[i]
+            local bh = (val / 100) * gh
+            if bh < 1 then bh = 1 end
+            local bx = x + gw - (age + 1) * step
+            if bx >= x then
+                local by = y + gh - bh
+                local col = val > 80 and C.coral or (val > 50 and C.amber or C.cyan)
+                rrect(cr, bx, by, bw, bh, 1*s, {col[1], col[2], col[3], 0.15 + 0.40 * val / 100})
+            end
+        end
+    end
+end
+
+--- Curved connection lines between elements
+local function draw_flow_lines(cr, w, h, s)
+    -- Cluster to system info
+    local cx1, cy1 = w*0.14, h*0.25
+    local sx, sy = w*0.28, h*0.12
+    cairo_new_path(cr)
+    cairo_move_to(cr, cx1 + 200*s, cy1)
+    cairo_curve_to(cr, cx1 + 280*s, cy1 - 40*s, sx - 40*s, sy + 40*s, sx - 14*s, sy)
+    cairo_set_source_rgba(cr, C.cyan[1], C.cyan[2], C.cyan[3], 0.06)
+    cairo_set_line_width(cr, 1*s)
+    cairo_set_line_cap(cr, CAIRO_LINE_CAP_ROUND)
+    cairo_stroke(cr)
+    -- Small dot at end
+    circ(cr, sx - 14*s, sy, 2*s, {C.cyan[1], C.cyan[2], C.cyan[3], 0.15})
+
+    -- Cluster to temps
+    local tx, ty = w*0.08, h*0.52
+    cairo_new_path(cr)
+    cairo_move_to(cr, cx1, cy1 + 200*s)
+    cairo_curve_to(cr, cx1 - 30*s, cy1 + 280*s, tx + 30*s, ty - 60*s, tx, ty - 30*s)
+    cairo_set_source_rgba(cr, C.cyan[1], C.cyan[2], C.cyan[3], 0.06)
+    cairo_set_line_width(cr, 1*s)
+    cairo_stroke(cr)
+    circ(cr, tx, ty - 30*s, 2*s, {C.cyan[1], C.cyan[2], C.cyan[3], 0.15})
 end
 
 --- Decorations
@@ -567,7 +660,7 @@ function conky_main()
 
     -- ── Network graphs (below temps/storage) ──
     local ifc = get_iface()
-    local ng_x, ng_y = margin, h*0.65
+    local ng_x, ng_y = margin, h*0.64
     local ng_w = w*0.16
     local nd = cache._nsd_down or ctrim("${downspeed "..ifc.."}")
     local nu = cache._nsd_up   or ctrim("${upspeed "..ifc.."}")
@@ -585,11 +678,17 @@ function conky_main()
     -- ── Processes (next to gauge cluster) ──
     draw_procs(cr, w*0.28, h*0.22, s)
 
+    -- ── Flow lines (connections between elements) ──
+    draw_flow_lines(cr, w, h, s)
+
     -- ── System info (above processes) ──
     draw_sysinfo(cr, w*0.28, h*0.12, s)
 
+    -- ── CPU load history (below gauge cluster, aligned with network) ──
+    draw_cpu_history(cr, margin, h*0.40, ng_w, 60*s, s)
+
     -- ── Next event countdown (above calendar) ──
-    draw_next_event(cr, cal_x + 20*s, h*0.38 - 85*s, cal_w, s)
+    draw_next_event(cr, cal_x + 20*s, h*0.38 - 110*s, cal_w, s)
 
     -- ── Now Playing + Visualizer (bottom-left) ──
     draw_np_vis(cr, margin, h*0.84, w*0.22, s)
