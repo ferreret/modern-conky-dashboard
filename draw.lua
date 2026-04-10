@@ -37,7 +37,7 @@ end
 local cache, ext, num_cores, frame = {}, nil, nil, 0
 -- Network history for graphs
 local net_hist_down, net_hist_up = {}, {}
-local NET_HIST_LEN = 60
+local NET_HIST_LEN = 200
 
 local function init_ext()
     if not ext then ext = cairo_text_extents_t:create()
@@ -264,29 +264,33 @@ local function draw_storage_gauges(cr, x, y, s)
     end
 end
 
---- Network speed graph (area chart)
-local function draw_net_graph(cr, x, y, gw, gh, hist, col, label, speed_str, s)
+--- Network speed graph with labels on sides, bars fill between
+local function draw_net_graph(cr, x, y, gw, gh, hist, col, label, speed_str, total_str, s)
+    -- Labels
+    txt(cr, label, x, y-8*s, SANS, 14*s, col, false, "l")
+    txt(cr, speed_str, x+gw, y-8*s, MONO, 14*s, col, false, "r")
+    txt(cr, total_str, x+gw+10*s, y+gh/2+4*s, MONO, 16*s, C.w35, false, "l")
+
     -- Find max for scaling
     local mx = 1
     for _, v in ipairs(hist) do if v > mx then mx = v end end
 
-    -- Draw as thin vertical bars (newest on right)
+    -- Bars: anchored to RIGHT edge, grow leftward as history fills
     if #hist > 0 then
         local bw = 3 * s
         local gap = 0.5 * s
-        for i, v in ipairs(hist) do
-            local idx = #hist - i  -- reverse: newest on right
-            local bh = (v / mx) * gh
+        local step = bw + gap
+        for i = 1, #hist do
+            local age = #hist - i  -- 0 = newest, grows = older
+            local bh = (hist[i] / mx) * gh
             if bh < 1 then bh = 1 end
-            local bx = x + gw - (idx + 1) * (bw + gap)
-            local by = y + gh - bh
-            rrect(cr, bx, by, bw, bh, 1 * s, {col[1], col[2], col[3], 0.15 + 0.40 * (v / mx)})
+            local bx = x + gw - (age + 1) * step
+            if bx >= x then
+                local by = y + gh - bh
+                rrect(cr, bx, by, bw, bh, 1 * s, {col[1], col[2], col[3], 0.15 + 0.40 * (hist[i] / mx)})
+            end
         end
     end
-
-    -- Label and speed
-    txt(cr, label, x, y-8*s, SANS, 16*s, col, false, "l")
-    txt(cr, speed_str, x+gw, y-8*s, MONO, 16*s, col, false, "r")
 end
 
 --- Clock (top-right corner with margins)
@@ -443,6 +447,77 @@ local function draw_np_vis(cr, x, y, vis_w, s)
     end
 end
 
+--- Floating system info (center of screen, subtle)
+local function draw_sysinfo(cr, x, y, s)
+    local ifc = get_iface()
+    local host = stc("host", "${nodename}")
+    local dist = stc("dist", "${exec lsb_release -ds 2>/dev/null || (. /etc/os-release && echo $PRETTY_NAME)}")
+    local cpu_n = stc("cpu_n", "${exec grep 'model name' /proc/cpuinfo | head -1 | sed 's/.*\\(i[0-9]-[^ ]*\\).*/\\1/'}")
+    local gpu_n = stc("gpu_n", "${exec nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | sed 's/NVIDIA //'}")
+    local kern = cstr("${kernel}")
+    local ip = ctrim("${addr "..ifc.."}")
+    local up = cstr("${uptime_short}")
+
+    -- Small decorative dot
+    circ(cr, x-12*s, y-4*s, 3*s, C.cyan)
+
+    local gap = 24*s
+    txt(cr, host, x, y, MONO, 22*s, C.cyan, true, "l")
+    txt(cr, dist.."  ·  "..kern, x, y+gap, MONO, 16*s, C.w50, false, "l")
+    txt(cr, cpu_n.."  ·  "..gpu_n, x, y+gap*2, MONO, 16*s, C.w50, false, "l")
+    txt(cr, "IP "..ip.."  ·  Up "..up, x, y+gap*3, MONO, 16*s, C.w50, false, "l")
+end
+
+--- Next event countdown
+local function draw_next_event(cr, x, y, pw, s)
+    local cal = get_calendar()
+    if type(cal) ~= "table" or #cal == 0 then return end
+
+    local now = os.time()
+    local today = os.date("%Y-%m-%d")
+
+    -- Find next event with a specific time
+    local next_ev = nil
+    for _, ev in ipairs(cal) do
+        if ev.time ~= "all day" then
+            local h, m = ev.time:match("(%d+):(%d+)")
+            if h and m then
+                local y2, m2, d2 = ev.date:match("(%d+)-(%d+)-(%d+)")
+                if y2 then
+                    local ev_time = os.time({year=tonumber(y2), month=tonumber(m2), day=tonumber(d2),
+                                             hour=tonumber(h), min=tonumber(m), sec=0})
+                    if ev_time > now then
+                        next_ev = { title = ev.title, time = ev.time:sub(1,5), timestamp = ev_time }
+                        break
+                    end
+                end
+            end
+        end
+    end
+
+    if not next_ev then return end
+
+    local diff = next_ev.timestamp - now
+    local hours = math.floor(diff / 3600)
+    local mins = math.floor((diff % 3600) / 60)
+
+    local countdown
+    if hours > 0 then
+        countdown = string.format("in %dh %dm", hours, mins)
+    else
+        countdown = string.format("in %dm", mins)
+    end
+
+    -- Accent line
+    ln(cr, x, y, x + pw * 0.6, y, 1*s, {C.pink[1], C.pink[2], C.pink[3], 0.2})
+
+    txt(cr, "NEXT", x, y+22*s, SANS, 20*s, C.pink, true, "l")
+    txt(cr, countdown, x + 70*s, y+22*s, MONO, 17*s, {C.pink[1], C.pink[2], C.pink[3], 0.7}, false, "l")
+
+    local title = next_ev.title or ""
+    txt(cr, next_ev.time.."  "..title, x, y+48*s, MONO, 16*s, C.w50, false, "l")
+end
+
 --- Decorations
 local function draw_deco(cr, w, h, s)
     local m, cl = 22*s, 18*s
@@ -485,23 +560,21 @@ function conky_main()
     draw_cluster(cr, w*0.14, h*0.25, s)
 
     -- ── Temperature gauges (below cluster) ──
-    draw_temps(cr, w*0.08, h*0.56, s)
+    draw_temps(cr, w*0.08, h*0.52, s)
 
     -- ── Storage gauges (next to temps) ──
-    draw_storage_gauges(cr, w*0.24, h*0.56, s)
+    draw_storage_gauges(cr, w*0.18, h*0.52, s)
 
     -- ── Network graphs (below temps/storage) ──
     local ifc = get_iface()
     local ng_x, ng_y = margin, h*0.65
-    local ng_w = w*0.28
+    local ng_w = w*0.16
     local nd = cache._nsd_down or ctrim("${downspeed "..ifc.."}")
     local nu = cache._nsd_up   or ctrim("${upspeed "..ifc.."}")
     local ntd = cache._nsd_td  or ctrim("${totaldown "..ifc.."}")
     local ntu = cache._nsd_tu  or ctrim("${totalup "..ifc.."}")
-    draw_net_graph(cr, ng_x, ng_y, ng_w, 45*s, net_hist_down, C.green, "DOWNLOAD", nd, s)
-    txt(cr, "Total "..ntd, ng_x+ng_w+12*s, ng_y+35*s, MONO, 16*s, C.w35, false, "l")
-    draw_net_graph(cr, ng_x, ng_y+65*s, ng_w, 45*s, net_hist_up, C.coral, "UPLOAD", nu, s)
-    txt(cr, "Total "..ntu, ng_x+ng_w+12*s, ng_y+100*s, MONO, 16*s, C.w35, false, "l")
+    draw_net_graph(cr, ng_x, ng_y, ng_w, 40*s, net_hist_down, C.green, "DOWNLOAD", nd, "Total "..ntd, s)
+    draw_net_graph(cr, ng_x, ng_y+100*s, ng_w, 40*s, net_hist_up, C.coral, "UPLOAD", nu, "Total "..ntu, s)
 
     -- ── Calendar (right side) ──
     local cal_w = w*0.14
@@ -511,6 +584,12 @@ function conky_main()
 
     -- ── Processes (next to gauge cluster) ──
     draw_procs(cr, w*0.28, h*0.22, s)
+
+    -- ── System info (above processes) ──
+    draw_sysinfo(cr, w*0.28, h*0.12, s)
+
+    -- ── Next event countdown (above calendar) ──
+    draw_next_event(cr, cal_x + 20*s, h*0.38 - 85*s, cal_w, s)
 
     -- ── Now Playing + Visualizer (bottom-left) ──
     draw_np_vis(cr, margin, h*0.84, w*0.22, s)
