@@ -13,8 +13,8 @@ fi
 
 "$GCALCLI" agenda --nostarted --nodeclined --tsv \
     "$(date '+%Y-%m-%dT%H:%M')" \
-    "$(date -d '+2 days' '+%Y-%m-%dT23:59')" 2>/dev/null \
-    | tail -n+2 | head -12 > "$CACHE"
+    "$(date -d '+7 days' '+%Y-%m-%dT23:59')" 2>/dev/null \
+    | tail -n+2 | head -30 > "$CACHE"
 
 # If empty, write marker
 [ ! -s "$CACHE" ] && echo "NO_EVENTS" > "$CACHE"
