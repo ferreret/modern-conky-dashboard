@@ -1,0 +1,8 @@
+# Git multi-repo status widget — repo list
+# One repo path per line. Lines starting with # are ignored. ~ expands to $HOME.
+# Optional alias with `|`:  /absolute/path|DisplayName
+
+# Examples:
+# ~/projects/my-awesome-app
+# ~/.dotfiles
+# /media/data/work/backend|Work Backend

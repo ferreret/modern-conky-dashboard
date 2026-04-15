@@ -13,9 +13,9 @@ local C = {
     amber  = {1.00, 0.76, 0.28, 1.0},
     pink   = {1.00, 0.47, 0.78, 1.0},
     white  = {1, 1, 1, 0.95},
-    w70    = {1, 1, 1, 0.70},
-    w50    = {1, 1, 1, 0.50},
-    w35    = {1, 1, 1, 0.35},
+    w70    = {1, 1, 1, 0.85},
+    w50    = {1, 1, 1, 0.68},
+    w35    = {1, 1, 1, 0.52},
     w20    = {1, 1, 1, 0.20},
     w10    = {1, 1, 1, 0.10},
     w05    = {1, 1, 1, 0.05},
@@ -53,6 +53,11 @@ local function txt(cr, s, x, y, font, sz, col, bold, align)
     local tx = x
     if align == "c" then tx = x - ext.width/2 - ext.x_bearing
     elseif align == "r" then tx = x - ext.width - ext.x_bearing end
+    -- Subtle shadow for legibility over varied wallpapers
+    local sh = math.max(1, sz * 0.06)
+    cairo_move_to(cr, tx + sh, y + sh)
+    cairo_set_source_rgba(cr, 0, 0, 0, 0.65)
+    cairo_show_text(cr, s)
     cairo_move_to(cr, tx, y)
     cairo_set_source_rgba(cr, col[1], col[2], col[3], col[4])
     cairo_show_text(cr, s); return ext.width
@@ -107,6 +112,20 @@ local function read_kv(path, ck, ttl)
 end
 local function get_weather() return read_kv("/tmp/conky-weather.txt","_w") end
 local function get_media()   return read_kv("/tmp/conky-media.txt","_m",1) end
+local function get_sysstatus() return read_kv("/tmp/conky-sysstatus.txt","_ss",30) end
+
+local function get_gitstatus()
+    if cache._gs and cache._gst and os.time()-cache._gst<30 then return cache._gs end
+    local items,f = {},io.open("/tmp/conky-gitstatus.txt","r")
+    if not f then cache._gs=nil; cache._gst=os.time(); return nil end
+    for l in f:lines() do
+        if l=="NO_LIST" or l=="NO_REPOS" then f:close(); cache._gs=l; cache._gst=os.time(); return l end
+        if l~="" then local flds={}; for fld in (l.."\t"):gmatch("([^\t]*)\t") do flds[#flds+1]=fld end
+            if #flds>=5 then items[#items+1]={name=flds[1], branch=flds[2],
+                dirty=tonumber(flds[3]) or 0, ahead=tonumber(flds[4]) or 0, behind=tonumber(flds[5]) or 0} end
+        end
+    end; f:close(); cache._gs=#items>0 and items or "NO_REPOS"; cache._gst=os.time(); return cache._gs
+end
 
 local function get_calendar()
     if cache._cal and cache._ct and os.time()-cache._ct<30 then return cache._cal end
@@ -337,19 +356,137 @@ local function draw_clock(cr, rx, y, s)
     local year = cstr("${time %Y}")
     txt(cr, day_name.."  "..day_num.." "..month.." "..year, rx, y+48*s, SANS, 28*s, C.w50, false, "r")
 
-    -- Weather
+    -- Weather mini (one line)
     local w = get_weather()
     if w and w.TEMP then
-        txt(cr, w.TEMP.."°C  "..(w.DESC or "").."  Hum "..(w.HUMIDITY or "?").."%",
-            rx, y+78*s, SANS, 22*s, C.amber, false, "r")
-        -- Forecast
-        for i = 1, 2 do
-            local p = "F"..i.."_"
-            local day = w[p.."DAY"] or ""
-            if #day > 3 then day = day:sub(1,3) end
-            txt(cr, day.."  "..(w[p.."MAX"] or "?").."/"..(w[p.."MIN"] or "?").."°  "..(w[p.."DESC"] or ""),
-                rx, y+(78+30*i)*s, SANS, 18*s, C.w35, false, "r")
+        txt(cr, w.TEMP.."°  "..(w.DESC or ""), rx, y+78*s, SANS, 22*s, C.amber, false, "r")
+    end
+end
+
+--- Weather widget (temp big + 24h sparkline + precip bars + UV + sun + forecast)
+local function wcode_color(code)
+    local c = tonumber(code) or 0
+    if c == 113 then return C.amber end                                 -- sunny
+    if c == 116 then return C.w70 end                                   -- partly cloudy
+    if c >= 119 and c <= 122 then return C.w50 end                      -- cloudy/overcast
+    if c == 143 or c == 248 or c == 260 then return C.w35 end           -- fog
+    if c == 200 or (c >= 386 and c <= 395) then return C.purple end     -- thunder
+    if c == 179 or (c >= 227 and c <= 230) or (c >= 320 and c <= 338)   -- snow
+        or (c >= 368 and c <= 395 and c ~= 386 and c ~= 389) then return C.white end
+    return C.cyan                                                       -- rain/drizzle default
+end
+
+local function uv_info(uv)
+    local u = tonumber(uv) or 0
+    if u <= 2 then return C.green, "low"
+    elseif u <= 5 then return C.amber, "moderate"
+    elseif u <= 7 then return C.coral, "high"
+    elseif u <= 10 then return C.pink, "very high"
+    else return C.purple, "extreme" end
+end
+
+local function draw_weather(cr, x, y, pw, s)
+    local w = get_weather()
+    if not w or not w.TEMP then return end
+
+    local col = wcode_color(w.CODE)
+
+    -- Header
+    txt(cr, "WEATHER", x, y, SANS, 22*s, col, true, "l")
+    ln(cr, x, y+14*s, x+120*s, y+14*s, 1*s, {col[1],col[2],col[3],0.25})
+
+    -- Big temp + feels
+    local ty = y + 74*s
+    txt(cr, w.TEMP.."°", x, ty, MONO, 68*s, C.white, false, "l")
+    local tw_px = #w.TEMP * 42*s + 22*s
+    txt(cr, "feels "..(w.FEELS or "?").."°", x+tw_px, ty-36*s, MONO, 17*s, C.w50, false, "l")
+    txt(cr, w.DESC or "", x+tw_px, ty-12*s, SANS, 19*s, col, false, "l")
+    if w.LOCATION then txt(cr, w.LOCATION, x+tw_px, ty+12*s, MONO, 14*s, C.w35, false, "l") end
+
+    -- 24h sparkline
+    local sp_y = ty + 36*s
+    local sp_h = 50*s
+    local sp_w = pw
+    local temps, precs, labels = {}, {}, {}
+    for i = 0, 7 do
+        local t = tonumber(w["H"..i.."_T"])
+        local p = tonumber(w["H"..i.."_P"])
+        local h = w["H"..i.."_H"]
+        if t then temps[#temps+1] = t; precs[#precs+1] = p or 0; labels[#labels+1] = h end
+    end
+    if #temps >= 2 then
+        local tmin, tmax = temps[1], temps[1]
+        for _, v in ipairs(temps) do if v<tmin then tmin=v end; if v>tmax then tmax=v end end
+        if tmax == tmin then tmax = tmin + 1 end
+
+        -- Axis line
+        ln(cr, x, sp_y+sp_h, x+sp_w, sp_y+sp_h, 1*s, C.w05)
+
+        -- Temp sparkline
+        cairo_new_path(cr)
+        cairo_set_line_width(cr, 2*s); cairo_set_line_cap(cr, CAIRO_LINE_CAP_ROUND)
+        cairo_set_source_rgba(cr, col[1], col[2], col[3], 0.9)
+        for i, t in ipairs(temps) do
+            local px = x + (i-1)/(#temps-1) * sp_w
+            local py = sp_y + sp_h - (t-tmin)/(tmax-tmin) * sp_h
+            if i == 1 then cairo_move_to(cr, px, py) else cairo_line_to(cr, px, py) end
+            circ(cr, px, py, 2.5*s, col)
         end
+        cairo_stroke(cr)
+
+        -- Temp labels at ends
+        txt(cr, tmax.."°", x-4*s, sp_y+8*s, MONO, 14*s, C.w50, false, "r")
+        txt(cr, tmin.."°", x-4*s, sp_y+sp_h+4*s, MONO, 14*s, C.w35, false, "r")
+
+        -- Hour labels (every other)
+        for i, h in ipairs(labels) do
+            if i == 1 or i == #labels or i % 2 == 0 then
+                local px = x + (i-1)/(#temps-1) * sp_w
+                txt(cr, h, px, sp_y+sp_h+20*s, MONO, 13*s, C.w35, false, "c")
+            end
+        end
+
+        -- Precipitation bars (only if any > 0)
+        local pmax = 0
+        for _, p in ipairs(precs) do if p>pmax then pmax=p end end
+        if pmax > 0 then
+            local bar_h = 12*s
+            local by = sp_y + sp_h + 24*s
+            for i, p in ipairs(precs) do
+                if p > 0 then
+                    local px = x + (i-1)/(#temps-1) * sp_w
+                    local bw = sp_w/#temps * 0.6
+                    local bh = math.min(p/math.max(pmax,1), 1) * bar_h
+                    rrect(cr, px-bw/2, by+bar_h-bh, bw, bh, 1*s, {C.cyan[1],C.cyan[2],C.cyan[3],0.7})
+                end
+            end
+            txt(cr, string.format("%.1fmm", pmax), x+sp_w, by+bar_h-2*s, MONO, 13*s, C.cyan, false, "r")
+        end
+    end
+
+    -- Stats row
+    local st_y = sp_y + sp_h + 56*s
+    local uv_c, uv_t = uv_info(w.UV)
+    circ(cr, x+5*s, st_y-5*s, 4*s, uv_c)
+    txt(cr, "UV "..(w.UV or "?").." "..uv_t, x+18*s, st_y, MONO, 16*s, uv_c, false, "l")
+    txt(cr, "↑"..(w.SUNRISE or "?"):gsub(" AM",""):gsub(" PM",""), x+pw, st_y, MONO, 16*s, C.amber, false, "r")
+
+    txt(cr, (w.WIND_DIR or "?").." "..(w.WIND or "?").."km/h", x+18*s, st_y+26*s, MONO, 16*s, C.w70, false, "l")
+    txt(cr, "↓"..(w.SUNSET or "?"):gsub(" AM",""):gsub(" PM",""), x+pw, st_y+26*s, MONO, 16*s, {C.amber[1],C.amber[2],C.amber[3],0.6}, false, "r")
+
+    txt(cr, "Hum "..(w.HUMIDITY or "?").."% · "..(w.PRESSURE or "?").."hPa", x+18*s, st_y+52*s, MONO, 16*s, C.w50, false, "l")
+
+    -- 3-day forecast
+    local fc_y = st_y + 88*s
+    for i = 0, 2 do
+        local p = "F"..i.."_"
+        local day = w[p.."DAY"] or ""
+        if #day > 3 then day = day:sub(1,3) end
+        local fcol = wcode_color(w[p.."CODE"])
+        circ(cr, x+5*s, fc_y+i*28*s-5*s, 3.5*s, fcol)
+        txt(cr, day, x+18*s, fc_y+i*28*s, MONO, 17*s, C.w70, false, "l")
+        txt(cr, (w[p.."DESC"] or ""):sub(1,16), x+76*s, fc_y+i*28*s, MONO, 15*s, C.w35, false, "l")
+        txt(cr, (w[p.."MAX"] or "?").."°/"..(w[p.."MIN"] or "?").."°", x+pw, fc_y+i*28*s, MONO, 17*s, fcol, false, "r")
     end
 end
 
@@ -486,7 +623,7 @@ local function draw_sysinfo(cr, x, y, s)
 
     local gap = 24*s
     -- Check updates (cached hourly)
-    if not cache._upd or not cache._upd_t or os.time() - cache._upd_t >= 3600 then
+    if not cache._upd or not cache._upd_t or os.time() - cache._upd_t >= 300 then
         local f = io.popen("apt list --upgradable 2>/dev/null | grep -c upgradable")
         cache._upd = tonumber(f and f:read("*l")) or 0
         if f then f:close() end
@@ -626,6 +763,99 @@ local function draw_garmin(cr, x, y, s)
     txt(cr, steps.." steps", x+18*s, ly+4*s, MONO, 16*s, C.w50, false, "l")
 end
 
+-- Proxmox: parses the multi-section /tmp file (header KVs + GUEST=...|...|... + STORE=...)
+local function read_proxmox(ttl)
+    local ck = "_pmx"
+    if cache[ck] and cache[ck.."t"] and os.time()-cache[ck.."t"]<(ttl or 30) then return cache[ck] end
+    local f = io.open("/tmp/conky-proxmox.txt", "r"); if not f then return nil end
+    local d = { guests = {}, stores = {} }
+    for l in f:lines() do
+        local g = l:match("^GUEST=(.+)$")
+        local st = l:match("^STORE=(.+)$")
+        if g then
+            local vmid, kind, status, name, cpu, mem = g:match("([^|]+)|([^|]+)|([^|]+)|([^|]+)|([^|]+)|([^|]+)")
+            if vmid then d.guests[#d.guests+1] = {id=vmid, kind=kind, status=status, name=name, cpu=tonumber(cpu) or 0, mem=tonumber(mem) or 0} end
+        elseif st then
+            local sname, pct = st:match("([^|]+)|([^|]+)")
+            if sname then d.stores[#d.stores+1] = {name=sname, pct=tonumber(pct) or 0} end
+        else
+            local k, v = l:match("^([%w_]+)=(.+)$")
+            if k then d[k] = v end
+        end
+    end
+    f:close()
+    if not d.STATUS then return nil end
+    cache[ck] = d; cache[ck.."t"] = os.time(); return d
+end
+
+--- Proxmox panel — bottom horizontal banner
+local function draw_proxmox(cr, x, y, w, s)
+    local p = read_proxmox(30); if not p then return end
+
+    txt(cr, "PROXMOX", x, y, SANS, 22*s, C.purple, true, "l")
+    ln(cr, x, y+14*s, x+120*s, y+14*s, 1*s, {C.purple[1],C.purple[2],C.purple[3],0.25})
+
+    if p.STATUS ~= "OK" then
+        txt(cr, p.STATUS or "ERR", x+130*s, y+6*s, MONO, 16*s, C.coral, false, "l")
+        return
+    end
+
+    -- Header line: cpu/mem/disk + uptime + load
+    local hy = y + 6*s
+    local hx = x + 140*s
+    local function metric(label, val, col)
+        txt(cr, label, hx, hy, MONO, 15*s, C.w50, false, "l"); hx = hx + 40*s
+        local pct = tonumber(val) or 0
+        local c = pct > 80 and C.coral or (pct > 60 and C.amber or col)
+        txt(cr, pct.."%", hx, hy, MONO, 17*s, c, true, "l"); hx = hx + 68*s
+    end
+    metric("CPU", p.CPU, C.cyan)
+    metric("MEM", p.MEM, C.purple)
+    metric("DSK", p.DISK, C.green)
+    txt(cr, "↑ "..(p.UPTIME or "?"), hx, hy, MONO, 16*s, C.w70, false, "l"); hx = hx + 140*s
+    txt(cr, "load "..(p.LOAD or "?"), hx, hy, MONO, 16*s, C.w50, false, "l")
+
+    -- Guests grid: compact, 2 cols, only running guests prioritized
+    local gy = y + 40*s
+    local cols = 2
+    local rows_max = 4
+    local row_h = 20*s
+    local cw = (w - 10*s) / cols
+    local shown = 0
+    for _, g in ipairs(p.guests) do
+        if g.status == "running" and shown < cols*rows_max then
+            local r = math.floor(shown/cols)
+            local c = shown % cols
+            local gx = x + c*cw
+            local ly = gy + r*row_h
+            local dot = (g.kind == "lxc") and C.amber or C.green
+            circ(cr, gx+4*s, ly+1*s, 4*s, dot)
+            local label = g.id.." "..g.name
+            if #label > 18 then label = label:sub(1,16).."…" end
+            txt(cr, label, gx+14*s, ly+6*s, MONO, 14*s, C.w70, false, "l")
+            txt(cr, g.cpu.."%", gx+120*s, ly+6*s, MONO, 13*s, C.w50, false, "l")
+            txt(cr, g.mem.."%", gx+155*s, ly+6*s, MONO, 13*s, C.w50, false, "l")
+            shown = shown + 1
+        end
+    end
+    local used_rows = math.ceil(math.max(shown,1)/cols)
+
+    -- Storage row at bottom of banner
+    local sy = gy + (used_rows*20 + 10)*s
+    local sx = x
+    for _, st in ipairs(p.stores) do
+        if sx > x + w - 90*s then break end
+        local pct = st.pct
+        local col = pct > 85 and C.coral or (pct > 70 and C.amber or C.green)
+        txt(cr, st.name, sx, sy, MONO, 14*s, C.w50, false, "l")
+        local bw = 70*s
+        rrect(cr, sx, sy+6*s, bw, 4*s, 1*s, C.w10)
+        rrect(cr, sx, sy+6*s, bw*pct/100, 4*s, 1*s, col)
+        txt(cr, pct.."%", sx+bw+8*s, sy+6*s, MONO, 13*s, col, false, "l")
+        sx = sx + bw + 72*s
+    end
+end
+
 --- Today's focus tasks
 local function draw_today(cr, x, y, s)
     local f = io.open("/tmp/conky-today.txt", "r")
@@ -706,6 +936,85 @@ local function draw_pending(cr, x, y, pw, s)
     end
 end
 
+--- System health: failed units, journal errors, reboot, docker
+local function draw_sysstatus(cr, x, y, s)
+    local d = get_sysstatus()
+    if not d then return end
+    local failed = tonumber(d.FAILED) or 0
+    local fuser  = tonumber(d.FAILED_USER) or 0
+    local jerr   = tonumber(d.JOURNAL_ERR) or 0
+    local reboot = tonumber(d.REBOOT) or 0
+    local d_av   = tonumber(d.DOCKER_AVAIL) or 0
+    local d_up   = tonumber(d.DOCKER_UP) or 0
+    local d_dn   = tonumber(d.DOCKER_DOWN) or 0
+    local d_uh   = tonumber(d.DOCKER_UNHEALTHY) or 0
+
+    txt(cr, "HEALTH", x, y, SANS, 20*s, C.green, true, "l")
+    ln(cr, x, y+12*s, x+100*s, y+12*s, 1*s, {C.green[1],C.green[2],C.green[3],0.22})
+
+    local ly = y + 38*s
+    local gap = 24*s
+
+    -- systemd
+    local sf_n = failed + fuser
+    local sf_c = sf_n == 0 and C.green or C.coral
+    circ(cr, x+4*s, ly, 4*s, sf_c)
+    local sf_t = sf_n == 0 and "systemd ok" or (sf_n.." failed unit"..(sf_n>1 and "s" or ""))
+    txt(cr, sf_t, x+16*s, ly+5*s, MONO, 15*s, sf_c, false, "l")
+    ly = ly + gap
+
+    -- journal errors (last hour)
+    local je_c = jerr == 0 and C.w50 or (jerr > 20 and C.coral or C.amber)
+    circ(cr, x+4*s, ly, 4*s, je_c)
+    txt(cr, jerr.." journal err / 1h", x+16*s, ly+5*s, MONO, 15*s, je_c, false, "l")
+    ly = ly + gap
+
+    -- reboot required
+    if reboot == 1 then
+        circ(cr, x+4*s, ly, 4*s, C.amber)
+        txt(cr, "reboot required", x+16*s, ly+5*s, MONO, 15*s, C.amber, false, "l")
+        ly = ly + gap
+    end
+
+    -- docker
+    if d_av == 1 then
+        local dc = d_uh > 0 and C.coral or (d_dn > 0 and C.amber or C.cyan)
+        circ(cr, x+4*s, ly, 4*s, dc)
+        local dt = string.format("docker  %d up · %d down", d_up, d_dn)
+        if d_uh > 0 then dt = dt..string.format(" · %d unhealthy", d_uh) end
+        txt(cr, dt, x+16*s, ly+5*s, MONO, 15*s, dc, false, "l")
+    end
+end
+
+--- Git multi-repo status
+local function draw_gitstatus(cr, x, y, pw, s)
+    local items = get_gitstatus()
+    if type(items) ~= "table" then return end
+
+    txt(cr, "GIT", x, y, SANS, 20*s, C.pink, true, "l")
+    ln(cr, x, y+12*s, x+60*s, y+12*s, 1*s, {C.pink[1],C.pink[2],C.pink[3],0.22})
+
+    local gap = 24*s
+    local ly = y + 38*s
+    for i, it in ipairs(items) do
+        if i > 8 then break end
+        local clean = it.dirty == 0 and it.ahead == 0 and it.behind == 0
+        local c = clean and C.green or (it.dirty > 0 and C.amber or C.cyan)
+        circ(cr, x+4*s, ly, 4*s, c)
+        local name = it.name
+        if #name > 18 then name = name:sub(1,16)..".." end
+        txt(cr, name, x+16*s, ly+5*s, MONO, 15*s, C.w70, false, "l")
+        txt(cr, it.branch, x+180*s, ly+5*s, MONO, 13*s, C.w35, false, "l")
+        local flags = {}
+        if it.dirty  > 0 then flags[#flags+1] = "*"..it.dirty end
+        if it.ahead  > 0 then flags[#flags+1] = "↑"..it.ahead end
+        if it.behind > 0 then flags[#flags+1] = "↓"..it.behind end
+        local f = table.concat(flags, " ")
+        if f ~= "" then txt(cr, f, x+pw, ly+5*s, MONO, 14*s, c, false, "r") end
+        ly = ly + gap
+    end
+end
+
 --- Curved connection lines between elements
 local function draw_flow_lines(cr, w, h, s)
     -- Cluster to system info
@@ -771,7 +1080,7 @@ function conky_main()
     draw_clock(cr, cal_right, h*0.13, s)
 
     -- ── Gauge cluster (left, big) ──
-    draw_cluster(cr, w*0.14, h*0.22, s)
+    draw_cluster(cr, w*0.10, h*0.18, s)
 
     -- ── Temperature gauges (below cluster) ──
     draw_temps(cr, w*0.08, h*0.52, s)
@@ -792,22 +1101,22 @@ function conky_main()
 
     -- ── Processes (next to gauge cluster) ──
     local proc_x = w*0.28
-    draw_procs(cr, proc_x, h*0.22, s)
+    draw_procs(cr, proc_x, h*0.18, s)
 
     -- ── Flow lines ──
     draw_flow_lines(cr, w, h, s)
 
     -- ── System info (above processes) ──
-    draw_sysinfo(cr, proc_x, h*0.12, s)
+    draw_sysinfo(cr, proc_x, h*0.08, s)
 
     -- ── Garmin vital signs (below processes) ──
-    draw_garmin(cr, proc_x, h*0.40, s)
+    draw_garmin(cr, proc_x, h*0.36, s)
+
+    -- ── System health (below garmin) ──
+    draw_sysstatus(cr, proc_x, h*0.50, s)
 
     -- ── CPU load history ──
     draw_cpu_history(cr, margin, h*0.40, ng_w, 60*s, s)
-
-    -- ── Inbox badge (near clock) ──
-    draw_inbox_badge(cr, cal_right - 530*s, h*0.13 - 80*s, s)
 
     -- ── Right side: Next event + Calendar + Pending ──
     local cal_w = w*0.14
@@ -818,8 +1127,17 @@ function conky_main()
     draw_calendar(cr, cal_x, cal_top, cal_w, cal_h, s)
     draw_pending(cr, cal_x + 20*s, cal_top + cal_h + 130*s, cal_w, s)
 
+    -- ── Git multi-repo status (below health) ──
+    draw_gitstatus(cr, proc_x, h*0.62, w*0.18, s)
+
     -- ── Now Playing + Visualizer (bottom-left) ──
     draw_np_vis(cr, margin, h*0.84, w*0.22, s)
+
+    -- ── Proxmox banner (left of clock) ──
+    draw_proxmox(cr, w*0.56, h*0.08, w*0.22, s*1.18)
+
+    -- ── Weather widget (right of Mazinger) ──
+    draw_weather(cr, w*0.60, h*0.48, w*0.18, s)
 
     cairo_destroy(cr)
     cairo_surface_destroy(cs)
