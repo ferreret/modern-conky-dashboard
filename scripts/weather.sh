@@ -2,8 +2,9 @@
 # Fetch weather data from wttr.in and cache to /tmp/conky-weather.txt
 # Called by conky via ${execi 1800 ...} (every 30 minutes)
 CACHE="/tmp/conky-weather.txt"
+LOCATION="${WEATHER_LOCATION:-Barcelona}"
 
-DATA=$(curl -s --max-time 10 "wttr.in/?format=j1" 2>/dev/null)
+DATA=$(curl -s --max-time 10 "wttr.in/${LOCATION}?format=j1" 2>/dev/null)
 
 if [ -z "$DATA" ] || ! echo "$DATA" | jq -e '.current_condition[0]' >/dev/null 2>&1; then
     exit 1
