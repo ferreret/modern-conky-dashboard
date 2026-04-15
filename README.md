@@ -1,8 +1,10 @@
 <div align="center">
 
+**🇬🇧 English** · [🇪🇸 Español](README.es.md)
+
 # 🤖 Modern Conky Dashboard
 
-### *Panel de control tipo cockpit para Linux, renderizado con Cairo sobre Conky*
+### *Cockpit-style control panel for Linux, rendered with Cairo on Conky*
 
 ![Conky](https://img.shields.io/badge/Conky-1.19%2B-00D8FF?style=for-the-badge&logo=linux&logoColor=white)
 ![Lua](https://img.shields.io/badge/Lua-5.1-2C2D72?style=for-the-badge&logo=lua&logoColor=white)
@@ -21,70 +23,70 @@
 
 ---
 
-## ✨ ¿Qué es esto?
+## ✨ What is this?
 
-Un **dashboard de escritorio** que se dibuja como overlay transparente a pantalla completa sobre tu wallpaper, combinando monitorización local (CPU, RAM, GPU, red, discos), servicios remotos (Proxmox, Google Calendar) y fuentes personales (Obsidian, Garmin) en un único panel con estética *organic layout* — sin rejillas, sin cajas, fuentes grandes y formas curvas que respetan el protagonismo del fondo.
+A **desktop dashboard** that draws itself as a full-screen transparent overlay on top of your wallpaper, combining local monitoring (CPU, RAM, GPU, network, disks), remote services (Proxmox, Google Calendar) and personal sources (Obsidian, Garmin) into a single panel with an *organic layout* aesthetic — no grids, no boxes, large fonts and curved shapes that respect the wallpaper's role.
 
-Diseñado para pantallas **4K** con escalado automático a cualquier resolución mediante un único parámetro `s = width / 3840`.
+Designed for **4K** displays with automatic scaling to any resolution through a single parameter `s = width / 3840`.
 
 ---
 
-## 📸 Captura
+## 📸 Screenshot
 
 ![Modern Conky Dashboard](docs/screenshot.png)
 
-> *Mazinger Z como protagonista · widgets fluyendo alrededor sin invadirle*
+> *Mazinger Z as the main subject · widgets flowing around without invading it*
 
 ---
 
-## 🎯 Características
+## 🎯 Features
 
-- 🧭 **Overlay a pantalla completa** transparente, `own_window_type = desktop`, no roba foco.
-- 📐 **Escalado responsive** — un único parámetro adapta todo el panel a cualquier resolución.
-- 🎨 **Renderizado Cairo** — gauges circulares, sparklines, barras suaves, tipografía con sombra sutil para legibilidad sobre wallpapers complejos.
-- ⚡ **Bajo consumo** — cachés inteligentes por widget (2s a 30min) y procesos cacheados en Lua.
-- 🔌 **Arquitectura de 17 widgets** componibles vía funciones `draw_*` declaradas en `conky_main()`.
-- 🌐 **Fuentes de datos heterogéneas** — Proxmox API, Google Calendar (gcalcli), Obsidian vault, Garmin (vía Obsidian), wttr.in, CAVA audio pipe, sensores hwmon, systemd, journalctl, git, docker…
-
----
-
-## 🧩 Widgets incluidos
-
-| # | Widget | Función | Fuente | Descripción |
-|---|--------|---------|--------|-------------|
-| 1 | 🕐 **Clock** | `draw_clock` | `${time}` | Reloj digital grande + fecha + mini weather |
-| 2 | 📊 **Cluster** | `draw_cluster` | Conky built-in | Gauges circulares superpuestos CPU/RAM/GPU con dots por core |
-| 3 | 🌡️ **Temps** | `draw_temps` | hwmon + nvidia | Termómetros CPU/GPU con heatmap por core |
-| 4 | 💾 **Storage** | `draw_storage_gauges` | `df -h` | Anillos por partición (hasta 3) |
-| 5 | 🌐 **Network Graphs** | `draw_net_graph` | Conky `${downspeed}` | Dual graph Down/Up con histórico 200 muestras |
-| 6 | 🖥️ **System Info** | `draw_sysinfo` | `/etc/os-release`, lscpu | Hostname, kernel, IP, uptime + contador apt upgradables |
-| 7 | ☁️ **Proxmox** | `draw_proxmox` | Proxmox REST API | Banner con CPU/MEM/DSK del nodo + guests running + storage |
-| 8 | ❤️ **Garmin** | `draw_garmin` | Obsidian vault | Body Battery, HR, estrés, pasos parseados del daily note |
-| 9 | 📅 **Calendar** | `draw_calendar` | gcalcli | Grid de eventos próximos 30 días |
-| 10 | 📌 **Pending** | `draw_pending` | Obsidian | Lista de temas en curso / planificados |
-| 11 | 🎵 **Now Playing** | `draw_np_vis` | MPRIS + CAVA | Título/artista + visualizador audio 64 barras |
-| 12 | 📈 **CPU History** | `draw_cpu_history` | Conky | Gráfico de barras histórico carga CPU |
-| 13 | ⚡ **Processes** | `draw_procs` | Conky `${top}` | Top 5 procesos por CPU con % MEM |
-| 14 | 🎨 **Flow Lines** | `draw_flow_lines` | — | Líneas conectoras curvas Bezier entre elementos |
-| 15 | 🩺 **Health** | `draw_sysstatus` | systemd, journalctl, docker | Unidades caídas, errores recientes, reboot-required, docker up/down/unhealthy |
-| 16 | 🌳 **Git Multi-repo** | `draw_gitstatus` | `git` CLI | Branch + dirty + ahead/behind de repos configurables |
-| 17 | ☀️ **Weather v2** | `draw_weather` | wttr.in JSON | Temp grande + sparkline 24h + barras de precipitación + UV + sunrise/sunset + forecast 3d |
-
-### 💤 Widgets huérfanos (código listo, pendientes de activar)
-
-- `draw_next_event` — cuenta atrás para el próximo evento del calendario.
-- `draw_today` — tareas `focus` del daily note de Obsidian.
+- 🧭 **Full-screen overlay** transparent, `own_window_type = desktop`, doesn't steal focus.
+- 📐 **Responsive scaling** — a single parameter adapts the whole panel to any resolution.
+- 🎨 **Cairo rendering** — circular gauges, sparklines, smooth bars, subtle text shadow for legibility over complex wallpapers.
+- ⚡ **Low footprint** — per-widget smart caches (2s to 30min) and Lua-cached processes.
+- 🔌 **17-widget composable architecture** via `draw_*` functions declared in `conky_main()`.
+- 🌐 **Heterogeneous data sources** — Proxmox API, Google Calendar (gcalcli), Obsidian vault, Garmin (via Obsidian), wttr.in, CAVA audio pipe, hwmon sensors, systemd, journalctl, git, docker…
 
 ---
 
-## 🏗️ Arquitectura
+## 🧩 Included widgets
+
+| # | Widget | Function | Source | Description |
+|---|--------|----------|--------|-------------|
+| 1 | 🕐 **Clock** | `draw_clock` | `${time}` | Large digital clock + date + mini weather |
+| 2 | 📊 **Cluster** | `draw_cluster` | Conky built-in | Overlapping circular gauges CPU/RAM/GPU with per-core dots |
+| 3 | 🌡️ **Temps** | `draw_temps` | hwmon + nvidia | CPU/GPU thermometers with per-core heatmap |
+| 4 | 💾 **Storage** | `draw_storage_gauges` | `df -h` | Ring per partition (up to 3) |
+| 5 | 🌐 **Network Graphs** | `draw_net_graph` | Conky `${downspeed}` | Dual Down/Up graph with 200-sample history |
+| 6 | 🖥️ **System Info** | `draw_sysinfo` | `/etc/os-release`, lscpu | Hostname, kernel, IP, uptime + apt upgradables counter |
+| 7 | ☁️ **Proxmox** | `draw_proxmox` | Proxmox REST API | Banner with node CPU/MEM/DSK + running guests + storage |
+| 8 | ❤️ **Garmin** | `draw_garmin` | Obsidian vault | Body Battery, HR, stress, steps parsed from daily note |
+| 9 | 📅 **Calendar** | `draw_calendar` | gcalcli | Upcoming 30-day events grid |
+| 10 | 📌 **Pending** | `draw_pending` | Obsidian | In-progress / planned topics list |
+| 11 | 🎵 **Now Playing** | `draw_np_vis` | MPRIS + CAVA | Title/artist + 64-bar audio visualizer |
+| 12 | 📈 **CPU History** | `draw_cpu_history` | Conky | CPU load history bar chart |
+| 13 | ⚡ **Processes** | `draw_procs` | Conky `${top}` | Top 5 processes by CPU with MEM % |
+| 14 | 🎨 **Flow Lines** | `draw_flow_lines` | — | Curved Bezier connector lines between elements |
+| 15 | 🩺 **Health** | `draw_sysstatus` | systemd, journalctl, docker | Failed units, recent errors, reboot-required, docker up/down/unhealthy |
+| 16 | 🌳 **Git Multi-repo** | `draw_gitstatus` | `git` CLI | Branch + dirty + ahead/behind for configurable repos |
+| 17 | ☀️ **Weather v2** | `draw_weather` | wttr.in JSON | Large temp + 24h sparkline + precipitation bars + UV + sunrise/sunset + 3-day forecast |
+
+### 💤 Orphan widgets (code ready, pending activation)
+
+- `draw_next_event` — countdown to next calendar event.
+- `draw_today` — `focus` tasks from the Obsidian daily note.
+
+---
+
+## 🏗️ Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                      conky.conf                         │
-│  · Ventana transparente full-screen                     │
+│  · Full-screen transparent window                       │
 │  · lua_load draw.lua + lua_draw_hook_pre main           │
-│  · ${execi N ...} lanza scripts periódicos              │
+│  · ${execi N ...} launches periodic scripts             │
 └─────────────┬───────────────────────────────────────────┘
               │
               ▼
@@ -97,78 +99,79 @@ Diseñado para pantallas **4K** con escalado automático a cualquier resolución
 │                                                         │
 │  Components: 17 × draw_* functions                      │
 │                                                         │
-│  conky_main() — orquesta posiciones relativas a w, h    │
+│  conky_main() — orchestrates positions relative to w, h │
 └─────────────┬───────────────────────────────────────────┘
               │
               ▼
 ┌─────────────────────────────────────────────────────────┐
-│                  scripts/*.sh  (caché → /tmp)           │
-│  weather.sh    → wttr.in              (30 min)          │
-│  calendar.sh   → gcalcli              (5 min)           │
-│  garmin.sh     → Obsidian daily note  (5 min)           │
-│  obsidian-*.sh → Vault parsing        (5 min)           │
-│  proxmox.sh    → Proxmox REST API     (30 s)            │
+│                  scripts/*.sh  (cache → /tmp)           │
+│  weather.sh    → wttr.in                (30 min)        │
+│  calendar.sh   → gcalcli                (5 min)         │
+│  garmin.sh     → Obsidian daily note    (5 min)         │
+│  obsidian-*.sh → Vault parsing          (5 min)         │
+│  proxmox.sh    → Proxmox REST API       (30 s)          │
 │  sysstatus.sh  → systemd+journal+docker (2 min)         │
-│  gitstatus.sh  → git CLI loop         (1 min)           │
-│  media.sh      → playerctl            (3 s)             │
-│  cava-pipe.sh  → CAVA audio           (continuo)        │
+│  gitstatus.sh  → git CLI loop           (1 min)         │
+│  media.sh      → playerctl              (3 s)           │
+│  cava-pipe.sh  → CAVA audio             (continuous)    │
 └─────────────────────────────────────────────────────────┘
 ```
 
-**Flujo de datos:** los scripts escriben a `/tmp/conky-*.txt` en formato KV (`KEY=value\n`) o TSV. Lua lee con `read_kv()` cacheado en memoria otros 30 s, de modo que el redraw a 0.2 s no martillea disco.
+**Data flow:** scripts write to `/tmp/conky-*.txt` in KV format (`KEY=value\n`) or TSV. Lua reads them with `read_kv()` cached in memory for another 30s, so the 0.2s redraw doesn't hammer disk.
 
-**Escalado:** toda geometría se multiplica por `s = window_width / 3840`. Diseñado para 4K, verificado hasta 1080p.
+**Scaling:** all geometry is multiplied by `s = window_width / 3840`. Designed for 4K, verified down to 1080p.
 
 ---
 
-## 🧰 Requisitos
+## 🧰 Requirements
 
-### Obligatorios
+### Mandatory
 
-- **Conky** ≥ 1.10 con soporte Lua + Cairo
-- **Lua** 5.1+ (normalmente incluido con Conky)
+- **Conky** ≥ 1.10 with Lua + Cairo support
+- **Lua** 5.1+ (usually bundled with Conky)
 - **Bash** 5+
-- **curl** + **jq** (para scripts que consumen JSON)
-- Una **Nerd Font** — el proyecto usa `DaddyTimeMono Nerd Font` (cambiar en `draw.lua` si quieres otra)
+- **curl** + **jq** (for scripts consuming JSON)
+- A **Nerd Font** — the project uses `DaddyTimeMono Nerd Font` (change in `draw.lua` for a different one)
 
-### Opcionales (habilitan widgets concretos)
+### Optional (enable specific widgets)
 
-| Dependencia | Habilita | Instalación |
-|-------------|----------|-------------|
-| `nvidia-smi` + driver | Gauges GPU, temp GPU | — |
-| `cava` | Visualizador audio | `apt install cava` |
+| Dependency | Enables | Install |
+|------------|---------|---------|
+| `nvidia-smi` + driver | GPU gauges, GPU temp | — |
+| `cava` | Audio visualizer | `apt install cava` |
 | `playerctl` | Now Playing | `apt install playerctl` |
 | `gcalcli` | Calendar | `pipx install gcalcli` |
 | `docker` | Docker stats | — |
 | `git` | Git multi-repo | — |
-| Proxmox con API token | Widget Proxmox | — |
-| Obsidian vault con daily notes | Garmin / Today / Pending | — |
+| Proxmox with API token | Proxmox widget | — |
+| Obsidian vault with daily notes | Garmin / Today / Pending | — |
 
 ---
 
-## 🚀 Instalación
+## 🚀 Installation
 
 ```bash
-# 1. Clonar en ~/.config/conky/modern
+# 1. Clone into ~/.config/conky/modern
 git clone https://github.com/ferreret/modern-conky-dashboard.git ~/.config/conky/modern
 cd ~/.config/conky/modern
 
-# 2. Dar permisos a los scripts
+# 2. Make scripts executable
 chmod +x start.sh scripts/*.sh
 
-# 3. Instalar la fuente (si no la tienes)
+# 3. Install the font (if you don't have it)
 #    https://github.com/ryanoasis/nerd-fonts/releases → DaddyTimeMono
 
-# 4. Configurar integraciones opcionales (ver abajo)
+# 4. Configure optional integrations (see below)
 cp .proxmox.env.example .proxmox.env
+cp .gitrepos.example .gitrepos
 $EDITOR .proxmox.env
 $EDITOR .gitrepos
 
-# 5. Lanzar
+# 5. Launch
 ./start.sh
 ```
 
-### Arrancar al iniciar sesión
+### Start on login
 
 ```bash
 # XDG autostart
@@ -184,7 +187,7 @@ EOF
 
 ---
 
-## ⚙️ Configuración
+## ⚙️ Configuration
 
 ### 🔐 Proxmox (`.proxmox.env`)
 
@@ -196,41 +199,41 @@ PVE_TOKEN_SECRET=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 PVE_INSECURE=1
 ```
 
-> 🔒 Crear un token de solo lectura en Proxmox con rol **PVEAuditor** — nunca uses credenciales de admin.
+> 🔒 Create a read-only token in Proxmox with the **PVEAuditor** role — never use admin credentials.
 
 ### 🌳 Git Multi-repo (`.gitrepos`)
 
-Un path por línea. `~` expande a `$HOME`. Se admite alias con `|`:
+One path per line. `~` expands to `$HOME`. Optional alias with `|`:
 
 ```
-# Dotfiles y config
+# Dotfiles and config
 ~/.config/conky/modern
 
-# Proyectos con alias
-/media/data/proyecto-largo|MiProyecto
-~/work/cliente-x/backend|Cliente-X API
+# Projects with alias
+/media/data/long-project|MyProject
+~/work/client-x/backend|Client-X API
 ```
 
 ### 📔 Obsidian
 
-Los scripts `garmin.sh`, `obsidian-today.sh` y `obsidian-pending.sh` asumen:
-- Vault en `$HOME/<NombreVault>` (ajustable en cada script)
-- Daily notes en formato `YYYY-MM-DD.md` con campos estándar de Obsidian
+The `garmin.sh`, `obsidian-today.sh` and `obsidian-pending.sh` scripts assume:
+- Vault at `$HOME/<VaultName>` (adjustable in each script)
+- Daily notes in `YYYY-MM-DD.md` format with standard Obsidian fields
 
 ### 📅 Google Calendar
 
-Primera autenticación:
+First-time authentication:
 
 ```bash
 pipx install gcalcli
-gcalcli list   # abre navegador para OAuth
+gcalcli list   # opens browser for OAuth
 ```
 
-El script `calendar.sh` consulta los próximos 30 días.
+The `calendar.sh` script queries the upcoming 30 days.
 
-### 🎨 Colores y fuentes
+### 🎨 Colors and fonts
 
-Paleta definida al inicio de `draw.lua`:
+Palette defined at the top of `draw.lua`:
 
 ```lua
 local C = {
@@ -240,12 +243,12 @@ local C = {
     green  = {0.30, 0.96, 0.68, 1.0},
     amber  = {1.00, 0.76, 0.28, 1.0},
     pink   = {1.00, 0.47, 0.78, 1.0},
-    -- grises con alpha ajustado para fondos variados
+    -- greys with tuned alpha for varied backgrounds
     w70 = {1,1,1,0.85}, w50 = {1,1,1,0.68}, w35 = {1,1,1,0.52},
 }
 ```
 
-Fuente en `MONO` y `SANS`:
+Font in `MONO` and `SANS`:
 
 ```lua
 local MONO = "DaddyTimeMono Nerd Font"
@@ -254,137 +257,137 @@ local SANS = "DaddyTimeMono Nerd Font"
 
 ---
 
-## 🎛️ Personalización de layout
+## 🎛️ Layout customization
 
-Todas las posiciones se declaran en `conky_main()` con fracciones de `w` y `h`. Para mover un widget, edita la llamada:
+All positions are declared in `conky_main()` as fractions of `w` and `h`. To move a widget, edit the call:
 
 ```lua
--- Antes
+-- Before
 draw_weather(cr, w*0.60, h*0.48, w*0.18, s)
 
--- Más abajo y más a la izquierda
+-- Lower and more to the left
 draw_weather(cr, w*0.58, h*0.55, w*0.20, s)
 ```
 
-**Convenciones:**
-- `x, y` → posición de anclaje (normalmente esquina superior izquierda del widget).
-- `pw` → ancho disponible (para widgets con contenido adaptativo).
-- `s` → factor de escala global.
+**Conventions:**
+- `x, y` → anchor position (usually the widget's top-left corner).
+- `pw` → available width (for widgets with adaptive content).
+- `s` → global scaling factor.
 
 ---
 
-## 📂 Estructura del proyecto
+## 📂 Project structure
 
 ```
 modern/
-├── conky.conf              Configuración de Conky (ventana + execi scripts)
-├── draw.lua                ~1300 líneas, toda la lógica de render
-├── start.sh                Launcher con pre-fetch de datos
-├── cava.conf               Configuración del visualizador de audio
-├── .proxmox.env.example    Plantilla de variables Proxmox
-├── .gitrepos               Lista de repos a monitorizar
+├── conky.conf              Conky configuration (window + execi scripts)
+├── draw.lua                ~1300 lines, all render logic
+├── start.sh                Launcher with data pre-fetch
+├── cava.conf               Audio visualizer configuration
+├── .proxmox.env.example    Proxmox variables template
+├── .gitrepos.example       Git repo list template
 ├── scripts/
 │   ├── weather.sh          wttr.in → JSON → KV
 │   ├── calendar.sh         gcalcli → TSV
 │   ├── garmin.sh           Obsidian daily → KV
-│   ├── obsidian-today.sh   Focus tasks del daily
-│   ├── obsidian-pending.sh Temas en curso
-│   ├── obsidian-inbox.sh   Contador inbox
-│   ├── proxmox.sh          API REST → KV
+│   ├── obsidian-today.sh   Daily note focus tasks
+│   ├── obsidian-pending.sh In-progress topics
+│   ├── obsidian-inbox.sh   Inbox counter
+│   ├── proxmox.sh          REST API → KV
 │   ├── sysstatus.sh        systemd + journal + docker → KV
 │   ├── gitstatus.sh        git loop → TSV
 │   ├── media.sh            playerctl → KV
-│   └── cava-pipe.sh        CAVA → pipe continuo
-├── docs/                   Screenshots y docs
-└── PROGRESS_*.md           Notas de sesión (changelog informal)
+│   └── cava-pipe.sh        CAVA → continuous pipe
+├── docs/                   Screenshots and docs
+└── PROGRESS_*.md           Session notes (informal changelog)
 ```
 
 ---
 
 ## 🩹 Troubleshooting
 
-| Síntoma | Causa probable | Solución |
-|---------|----------------|----------|
-| Pantalla negra sin widgets | Conky no arrancó | `journalctl --user -e` o lanzar sin `-d` para ver errores |
-| Widget vacío | Script no escribió caché | `ls -la /tmp/conky-*.txt`, ejecutar script a mano |
-| Texto cortado | Widget fuera de pantalla | Ajustar coordenadas en `conky_main()` |
-| GPU/Nvidia no aparece | `nvidia-smi` no disponible | Comentar `draw_cluster` GPU section |
-| Weather muestra "?" | Sin internet o wttr.in caído | `./scripts/weather.sh` manualmente |
-| Proxmox UNREACHABLE | Token expirado o host inaccesible | Verificar `.proxmox.env` y `curl -k $URL/api2/json/nodes` |
-| GIT no muestra nada | `.gitrepos` vacío | Añadir rutas (una por línea) |
+| Symptom | Likely cause | Fix |
+|---------|--------------|-----|
+| Black screen, no widgets | Conky failed to start | `journalctl --user -e` or launch without `-d` to see errors |
+| Empty widget | Script did not write cache | `ls -la /tmp/conky-*.txt`, run script manually |
+| Clipped text | Widget off-screen | Adjust coordinates in `conky_main()` |
+| No GPU/Nvidia data | `nvidia-smi` not available | Comment out GPU section in `draw_cluster` |
+| Weather shows "?" | No internet or wttr.in down | Run `./scripts/weather.sh` manually |
+| Proxmox UNREACHABLE | Token expired or host unreachable | Check `.proxmox.env` and `curl -k $URL/api2/json/nodes` |
+| GIT shows nothing | `.gitrepos` empty | Add paths (one per line) |
 
 ---
 
 ## 🗺️ Roadmap
 
-### ✅ Hecho
-- [x] Arquitectura de widgets componibles
-- [x] Escalado responsive (parámetro único)
-- [x] Integración Proxmox con API token
-- [x] Widget HEALTH (systemd, journal, reboot, docker)
-- [x] Widget GIT multi-repo con alias
-- [x] Weather v2 con sparkline 24h + UV + sun
-- [x] Sombra de texto para legibilidad en wallpapers variados
+### ✅ Done
+- [x] Composable widget architecture
+- [x] Responsive scaling (single parameter)
+- [x] Proxmox integration with API token
+- [x] HEALTH widget (systemd, journal, reboot, docker)
+- [x] GIT multi-repo widget with aliases
+- [x] Weather v2 with 24h sparkline + UV + sun
+- [x] Text shadow for legibility over varied wallpapers
 
-### 🚧 Siguientes candidatos
-- [ ] Activar `draw_next_event` y `draw_today` (código ya escrito)
-- [ ] Proxmox deep-dive — backups, snapshots viejos, temps del nodo
-- [ ] Obsidian extendido — streak daily notes + heatmap 90d, tags trending
-- [ ] Garmin profundo — sleep score, HRV, training load
-- [ ] Red avanzada — latencia sparkline + VPN/Tailscale status
+### 🚧 Next candidates
+- [ ] Activate `draw_next_event` and `draw_today` (code already written)
+- [ ] Proxmox deep-dive — backups, old snapshots, node temps
+- [ ] Extended Obsidian — daily notes streak + 90d heatmap, trending tags
+- [ ] Deep Garmin — sleep score, HRV, training load
+- [ ] Advanced network — latency sparkline + VPN/Tailscale status
 - [ ] GitHub CLI — PRs, reviews, GH Actions
-- [ ] Alertas AEMET oficiales
-- [ ] Pomodoro visual
-- [ ] Timeline horizontal del día (Calendar + focus blocks)
+- [ ] Official AEMET weather alerts
+- [ ] Visual pomodoro
+- [ ] Horizontal day timeline (Calendar + focus blocks)
 - [ ] RSS ticker
 
 ---
 
-## 🎨 Filosofía de diseño
+## 🎨 Design philosophy
 
 > *"Organic layout, large fonts, no grids"*
 
-- Los widgets **fluyen** alrededor del wallpaper en lugar de apilarse en rejilla.
-- Las fuentes son **grandes y legibles** incluso a distancia (diseñado para pantallas grandes).
-- El color denota **semántica** (verde = OK, ámbar = aviso, coral = crítico).
-- Las líneas curvas (`draw_flow_lines`) conectan grupos de información relacionada.
-- Cada widget tiene **headline minimalista** + contenido denso.
+- Widgets **flow** around the wallpaper instead of stacking in a grid.
+- Fonts are **large and readable** even from a distance (designed for large displays).
+- Color carries **semantics** (green = OK, amber = warning, coral = critical).
+- Curved lines (`draw_flow_lines`) connect related info groups.
+- Each widget has a **minimalist headline** + dense content.
 
 ---
 
-## 🤝 Contribuir
+## 🤝 Contributing
 
-Este es un proyecto personal pero las ideas son bienvenidas. Para proponer un widget nuevo:
+This is a personal project but ideas are welcome. To propose a new widget:
 
-1. Fork + rama `feat/mi-widget`
-2. Añade `scripts/mi-widget.sh` (si necesitas fuente externa)
-3. Añade `draw_mi_widget` en `draw.lua` siguiendo patrón existente
-4. Cablea `execi` en `conky.conf` y llama al widget en `conky_main()`
-5. PR con screenshot
-
----
-
-## 📜 Licencia
-
-MIT — ver `LICENSE`.
+1. Fork + branch `feat/my-widget`
+2. Add `scripts/my-widget.sh` (if you need an external source)
+3. Add `draw_my_widget` in `draw.lua` following the existing pattern
+4. Wire `execi` in `conky.conf` and call the widget from `conky_main()`
+5. PR with a screenshot
 
 ---
 
-## 🙏 Créditos
+## 📜 License
 
-- [Conky](https://github.com/brndnmtthws/conky) — el motor que lo hace posible
-- [wttr.in](https://wttr.in/) — datos meteorológicos gratuitos y divertidos
-- [gcalcli](https://github.com/insanum/gcalcli) — CLI para Google Calendar
-- [CAVA](https://github.com/karlstav/cava) — visualizador de audio
+MIT — see `LICENSE`.
+
+---
+
+## 🙏 Credits
+
+- [Conky](https://github.com/brndnmtthws/conky) — the engine that makes it possible
+- [wttr.in](https://wttr.in/) — free and fun weather data
+- [gcalcli](https://github.com/insanum/gcalcli) — Google Calendar CLI
+- [CAVA](https://github.com/karlstav/cava) — audio visualizer
 - [Nerd Fonts](https://www.nerdfonts.com/) — DaddyTimeMono
-- Inspiración: la comunidad r/unixporn y años mirando cockpits de aviones
+- Inspiration: the r/unixporn community and years of staring at aircraft cockpits
 
 ---
 
 <div align="center">
 
-**Hecho con ☕ y un 4K de sobra**
+**Made with ☕ and a spare 4K monitor**
 
-*Si te gusta, deja una ⭐ al repo — y compártelo con tu rice favorito.*
+*If you like it, leave a ⭐ on the repo — and share it with your favorite rice.*
 
 </div>
