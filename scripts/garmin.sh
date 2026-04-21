@@ -14,12 +14,12 @@ if [ -z "$ROW" ]; then echo "NO_DATA" > "$CACHE"; exit 0; fi
 
 BB=$(echo "$ROW" | awk -F'|' '{print $2}' | grep -oP '^\s*\K\d+')
 BB_PEAK=$(echo "$ROW" | awk -F'|' '{print $2}' | grep -oP 'pico \K\d+')
-SLEEP_H=$(echo "$ROW" | awk -F'|' '{print $3}' | grep -oP '[\d.]+(?=\s*h)')
+SLEEP_H=$(echo "$ROW" | awk -F'|' '{print $3}' | grep -oP -m1 '[\d.]+(?=\s*h)' | head -1)
 SLEEP_SCORE=$(echo "$ROW" | awk -F'|' '{print $3}' | grep -oP 'score \K\d+')
-HR=$(echo "$ROW" | awk -F'|' '{print $4}' | grep -oP '\d+')
+HR=$(echo "$ROW" | awk -F'|' '{print $4}' | grep -oP -m1 '\d+')
 STRESS=$(echo "$ROW" | awk -F'|' '{print $5}' | grep -oP '^\s*\K\d+')
 STRESS_TXT=$(echo "$ROW" | awk -F'|' '{print $5}' | grep -oP '\(\K[^)]+')
-STEPS=$(echo "$ROW" | awk -F'|' '{print $6}' | sed 's/[^0-9.]//g')
+STEPS=$(echo "$ROW" | awk -F'|' '{print $6}' | grep -oP -m1 '[\d.]+' | head -1)
 
 {
     echo "BB=${BB:-0}"
